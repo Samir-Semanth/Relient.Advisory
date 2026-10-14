@@ -80,7 +80,8 @@ app.use(helmet({ contentSecurityPolicy: { directives: {
   fontSrc: ['https://fonts.gstatic.com'], imgSrc: ["'self'", 'data:'], connectSrc: ["'self'"],
   upgradeInsecureRequests: null } } }));
 app.use(express.json({ limit: '300kb' }));
-if (require.main === module) app.use(express.static(path.join(__dirname, '..', 'public'))); // local dev; Vercel serves /public itself
+// Serves the website and admin page. On Vercel the CDN normally serves /public first; this is the safety net if it does not.
+app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/api', wrap(async (req, res, next) => { await boot(); next(); }));
 
 // ---------- Public ----------

@@ -56,6 +56,11 @@ Admin (`Authorization: Bearer <ADMIN_TOKEN>`): `/api/admin/enquiries[.csv]`, `/a
 - Not included: image uploads, multiple admin users, editing fixed page copy from the admin panel.
 
 ## Troubleshooting
+- **404 NOT_FOUND on your Vercel URL**: Vercel cannot see the project files at the right level. Check, in order:
+  1. Open `https://<your-domain>/api/health`. If it shows JSON (or "Database not configured"), the function runs and only the settings below need fixing. If it is also a 404, the files are in the wrong place.
+  2. Project > Settings > General > **Root Directory** must be the folder that *directly contains* `vercel.json`, `api/` and `public/`. If you uploaded the whole `reliant-backend` folder into a repo, set Root Directory to `reliant-backend` (or move its contents to the repo root).
+  3. Deployments > your latest deployment > **Functions** tab should list `api/index.js`. If it is empty, the Root Directory is still wrong.
+  4. Redeploy after any change.
 - **"Serverless Function has an invalid name ... must not contain any space"**: a folder or repo name contains a space. Rename it or deploy from inside this folder.
 - **API returns "Database not configured"**: `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` are missing in Vercel. Add them and redeploy.
 - **401 in the admin panel**: the token does not match `ADMIN_TOKEN`.
