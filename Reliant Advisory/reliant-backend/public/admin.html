@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Admin | Reliant Advisory</title>
+<style>body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#f8f9fb;color:#101828}main{max-width:1100px;margin:0 auto;padding:28px 20px 60px}h1{font:400 1.9rem Georgia,serif;margin:0 0 16px}h2{font:400 1.3rem Georgia,serif;margin:24px 0 10px}
+input,select,button,textarea{font:inherit;padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#101828}textarea{width:100%}button{cursor:pointer}.p{background:#b8541e;color:#fff;border-color:#b8541e}
+#tabs{display:flex;gap:8px;margin:18px 0;flex-wrap:wrap}#tabs button.on{background:#101828;color:#fff;border-color:#101828}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;margin-top:12px}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top}th{font-size:.78rem;color:#667085;text-transform:uppercase}
+td input[type=text]{width:100%}.m{white-space:pre-wrap;min-width:240px}.n{color:#667085;font-size:.85rem}.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.row>*{flex:1;min-width:160px}.row>button{flex:none}.box{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-top:12px}.w{overflow-x:auto}</style></head>
+<body><main><h1>Reliant Advisory admin</h1>
+<form id="f"><input id="t" type="password" placeholder="Admin token" autocomplete="current-password" required> <button class="p">Sign in</button> <span class="n" id="s"></span></form>
+<div id="tabs" hidden></div><div id="v"></div></main>
+<script>
+const $=s=>document.querySelector(s);let tok=sessionStorage.getItem("tok")||"",cur="enq",editId=null;
+const api=async(m,u,b)=>{const r=await fetch(u,{method:m,headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error(r.status);return r.json()};
+const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);k.flat().forEach(x=>e.append(x));return e};
+const tbl=(heads,rows)=>h("div",{className:"w"},h("table",{},h("thead",{},h("tr",{},heads.map(x=>h("th",{textContent:x})))),h("tbody",{},rows)));
+const td=(...k)=>h("td",{},...k);
+const T={enq:"Enquiries",cli:"Clients",ins:"Insights",stat:"Analytics"};
+$("#f").onsubmit=async e=>{e.preventDefault();tok=$("#t").value;try{await api("GET","/api/admin/stats");sessionStorage.setItem("tok",tok);$("#s").textContent="";start()}catch{$("#s").textContent="Wrong token."}};
+if(tok){$("#t").value=tok;api("GET","/api/admin/stats").then(start).catch(()=>0)}
+function start(){const t=$("#tabs");t.hidden=false;t.textContent="";for(const k in T)t.append(h("button",{textContent:T[k],className:k==cur?"on":"",onclick:()=>{cur=k;start()}}));show()}
+async function show(){const v=$("#v");v.textContent="";v.append(await({enq,cli,ins,stat})[cur]())}
+async function enq(){const rows=await api("GET","/api/admin/enquiries");
+const b=h("button",{textContent:"Export CSV",onclick:async()=>{const r=await fetch("/api/admin/enquiries.csv",{headers:{Authorization:"Bearer "+tok}});const a=h("a",{href:URL.createObjectURL(await r.blob()),download:"enquiries.csv"});a.click()}});
+return h("div",{},h("div",{className:"row"},h("span",{className:"n",textContent:rows.length+" enquiries"}),b),tbl(["Date","Contact","Service","Message","Status"],rows.map(x=>{
+const s=h("select",{onchange:()=>api("PATCH","/api/admin/enquiries/"+x.id,{status:s.value})});["new","contacted","closed"].forEach(v=>s.add(new Option(v,v)));s.value=x.status;
+return h("tr",{},td(new Date(x.created_at+"Z").toLocaleString()),td(h("span",{style:"white-space:pre-line",textContent:x.name+(x.company?" ("+x.company+")":"")+"\n"+x.email+(x.phone?"\n"+x.phone:"")})),td(x.service),h("td",{className:"m",textContent:x.message}),td(s))})))}
+async function cli(){const rows=await api("GET","/api/admin/clients");
+const n=h("input",{placeholder:"Organization name"}),s=h("input",{placeholder:"Sector"}),csv=h("textarea",{rows:5,placeholder:"Paste CSV: name,sector (one client per line), or choose a .csv file"}),file=h("input",{type:"file",accept:".csv,text/csv",onchange:async()=>{csv.value=await file.files[0].text()}});
+return h("div",{},h("h2",{textContent:"Add a client"}),h("div",{className:"row"},n,s,h("button",{className:"p",textContent:"Add",onclick:async()=>{if(n.value.trim()){await api("POST","/api/admin/clients",{name:n.value,sector:s.value});show()}}})),
+h("h2",{textContent:"Bulk upload (CSV)"}),h("div",{className:"box"},csv,h("div",{className:"row"},file,h("button",{className:"p",textContent:"Import",onclick:async()=>{const r=await api("POST","/api/admin/clients/import",{csv:csv.value});alert(r.imported+" clients imported");show()}}))),
+h("h2",{textContent:rows.length+" clients"}),tbl(["Name","Sector","Visible",""],rows.map(c=>{const u=p=>api("PATCH","/api/admin/clients/"+c.id,p);
+return h("tr",{},td(h("input",{type:"text",value:c.name,onchange:e=>u({name:e.target.value})})),td(h("input",{type:"text",value:c.sector||"",onchange:e=>u({sector:e.target.value})})),td(h("input",{type:"checkbox",checked:!!c.visible,onchange:e=>u({visible:e.target.checked})})),
+td(h("button",{textContent:"Delete",onclick:async()=>{if(confirm("Delete "+c.name+"?")){await api("DELETE","/api/admin/clients/"+c.id);show()}}})))})))}
+async function ins(){const rows=await api("GET","/api/admin/posts"),e=rows.find(x=>x.id==editId)||{};
+const ti=h("input",{placeholder:"Title",value:e.title||""}),ca=h("input",{placeholder:"Category (e.g. VAT)",value:e.category||""}),da=h("input",{type:"date",value:e.published_at?e.published_at.slice(0,10):""}),su=h("textarea",{rows:2,placeholder:"Short summary",value:e.summary||""}),bo=h("textarea",{rows:12,placeholder:"Article text. Leave a blank line between paragraphs.",value:e.body||""}),pu=h("input",{type:"checkbox",checked:!!e.published});
+const save=async()=>{const b={title:ti.value,category:ca.value,date:da.value,summary:su.value,body:bo.value,published:pu.checked};if(!b.title.trim())return;await(editId?api("PATCH","/api/admin/posts/"+editId,b):api("POST","/api/admin/posts",b));editId=null;show()};
+return h("div",{},h("h2",{textContent:editId?"Edit article":"New article"}),h("div",{className:"box"},h("div",{className:"row"},ti,ca,da),su,bo,h("div",{className:"row"},h("label",{},pu," Published (visible on the website)"),h("button",{className:"p",textContent:"Save",onclick:save}),h("button",{textContent:"New / clear",onclick:()=>{editId=null;show()}}))),
+h("h2",{textContent:"Articles"}),tbl(["Title","Status","Date",""],rows.map(p=>h("tr",{},td(p.title),td(p.published?"Published":"Draft"),td(p.published_at.slice(0,10)),td(h("button",{textContent:"Edit",onclick:()=>{editId=p.id;show()}})," ",h("button",{textContent:"Delete",onclick:async()=>{if(confirm("Delete this article?")){await api("DELETE","/api/admin/posts/"+p.id);show()}}}))))))}
+async function stat(){const s=await api("GET","/api/admin/stats");return h("div",{},h("h2",{textContent:"Page views, last 30 days"}),h("p",{className:"n",textContent:"Counted without cookies or personal data."}),tbl(["Page","Views"],s.views.map(v=>h("tr",{},td(v.path),td(String(v.n))))),h("h2",{textContent:"Enquiries by status"}),tbl(["Status","Count"],s.enquiries.map(v=>h("tr",{},td(v.status),td(String(v.n))))))}
+</script></body></html>
